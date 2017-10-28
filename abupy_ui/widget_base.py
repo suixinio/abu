@@ -15,8 +15,6 @@ warnings.simplefilter('ignore')
 @contextmanager
 def show_ui_ct():
     print('正在初始化界面元素，请稍后...')
-    import seaborn as sns
-    sns.set_context(rc={'figure.figsize': (14, 7)})
     from abupy import ABuStrUtil
     go_on = True
 
@@ -29,8 +27,11 @@ def show_ui_ct():
             logging.info(msg)
             go_on = False
     except:
-        # TODO
-        pass
+        # 如果是其它编码的字符路径会进到这里
+        import logging
+        msg = 'error！non English characters in the current running environment,abu will not work properly!'
+        logging.info(msg)
+        go_on = False
     yield go_on
 
     if go_on:

@@ -75,7 +75,13 @@ def to_unicode(text, encoding=None, errors='strict'):
                         'object, got %s' % type(text).__name__)
     if encoding is None:
         encoding = 'utf-8'
-    return text.decode(encoding, errors)
+
+    try:
+        decode_text = text.decode(encoding, errors)
+    except:
+        # 切换试一下，不行就需要上层处理
+        decode_text = text.decode('gbk' if encoding == 'utf-8' else 'utf-8', errors)
+    return decode_text
 
 
 def to_bytes(text, encoding=None, errors='strict'):
@@ -89,18 +95,22 @@ def to_bytes(text, encoding=None, errors='strict'):
                         'object, got %s' % type(text).__name__)
     if encoding is None:
         encoding = 'utf-8'
-    return text.encode(encoding, errors)
+    try:
+        encode_text = text.encode(encoding, errors)
+    except:
+        # 切换试一下，不行就需要上层处理
+        encode_text = text.encode('gbk' if encoding == 'utf-8' else 'utf-8', errors)
+    return encode_text
 
 
 def to_native_str(text, encoding=None, errors='strict'):
     """
     套接to_unicode和to_bytes针对python版本不同处理
 
-    颠倒转换本来的str类型：
-        python2 to_unicode
-        python3 to_bytes
+        python2 to_bytes
+        python3 to_unicode
     """
-    if ABuEnv.g_is_py3:
+    if not ABuEnv.g_is_py3:
         return to_bytes(text, encoding, errors)
     else:
         return to_unicode(text, encoding, errors)

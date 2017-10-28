@@ -16,6 +16,8 @@ from IPython.display import display
 from ipywidgets import FloatProgress, Text, Box
 
 from ..CoreBu import ABuEnv
+# noinspection PyUnresolvedReferences
+from ..CoreBu.ABuFixes import filter
 from ..UtilBu.ABuDTUtil import warnings_filter, catch_error
 from ..UtilBu import ABuFileUtil, ABuOsUtil
 from ..CoreBu.ABuParallel import run_in_subprocess, run_in_thread
@@ -149,7 +151,22 @@ def do_check_process_is_dead():
             if pop_progress is not None:
                 pop_progress.close()
 
+
+# 不管ui进度条有什么问题，也不能影响任务主进程主任务工作的进度执行
+@catch_error(log=False)
+def cache_socket_ready():
+    """通信临时文件准备工作"""
+    ABuFileUtil.ensure_dir(K_SOCKET_FN_BASE)
+    cache_list = os.listdir(ABuEnv.g_project_cache_dir)
+    socket_cache_list = list(filter(lambda cache: cache.startswith('abu_socket_progress'), cache_list))
+    if len(socket_cache_list) > 300:
+        # 如果有超过300个进度socket缓存，进行清理
+        for sk_name in socket_cache_list:
+            ABuFileUtil.del_file(os.path.join(ABuEnv.g_project_cache_dir, sk_name))
+
 if g_show_ui_progress and ABuEnv.g_main_pid == os.getpid() and ABuEnv.g_is_ipython:
+    # 通信临时文件准备工作
+    cache_socket_ready()
     # 如果是主进程执行进行子线程函数ui_progress_socket_work：处理子进程传递的进度条处理信息：创建，进度更新，销毁
     run_in_thread(ui_progress_socket_work)
     # 如果是主进程执行进行子线程函数check_process_is_dead：检测ui_progress_dict中的进程是否仍然活着，从字典中清除，close ui
@@ -159,7 +176,7 @@ if g_show_ui_progress and ABuEnv.g_main_pid == os.getpid() and ABuEnv.g_is_ipyth
 class AbuMulPidProgress(object):
     """多进程进度显示控制类"""
 
-    def __init__(self, total, label):
+    def __init__(self, total, label, show_progress=True):
         """
         外部使用eg：
         with AbuMulPidProgress(len(self.choice_symbols), 'pick stocks complete') as progress:
@@ -176,11 +193,14 @@ class AbuMulPidProgress(object):
         self.progress_widget = None
         self.text_widget = None
         self.progress_box = None
+        self.show_progress = show_progress
 
     # 不管ui进度条有什么问题，也不能影响任务工作的进度执行，反正有文字进度会始终显示
     @catch_error(log=False)
     def init_ui_progress(self):
         """初始化ui进度条"""
+        if not self.show_progress:
+            return
 
         if not ABuEnv.g_is_ipython or self._total < 2:
             return
@@ -200,6 +220,8 @@ class AbuMulPidProgress(object):
     @catch_error(log=False)
     def update_ui_progress(self, ps, ps_text):
         """更新文字进度条"""
+        if not self.show_progress:
+            return
 
         if not ABuEnv.g_is_ipython or self._total < 2:
             return
@@ -219,6 +241,8 @@ class AbuMulPidProgress(object):
     @catch_error(log=False)
     def close_ui_progress(self):
         """关闭ui进度条显示"""
+        if not self.show_progress:
+            return
 
         if not ABuEnv.g_is_ipython or self._total < 2:
             return
@@ -236,26 +260,26 @@ class AbuMulPidProgress(object):
         """
         以上下文管理器类方式实现__enter__，针对self._total分配self.display_step
         """
-        self.display_step = 1
-        if self._total >= 5000:
-            self.display_step = 50
-        elif self._total >= 3000:
-            self.display_step = 30
-        elif self._total >= 2000:
-            self.display_step = 20
-        elif self._total > 1000:
-            self.display_step = 10
-        elif self._total >= 600:
-            self.display_step = 6
-        elif self._total >= 300:
-            self.display_step = 3
-        elif self._total >= 100:
-            self.display_step = 2
-        elif self._total >= 20:
-            self.display_step = 2
-        self.epoch = 0
-        self.init_ui_progress()
-
+        if self.show_progress:
+            self.display_step = 1
+            if self._total >= 5000:
+                self.display_step = 50
+            elif self._total >= 3000:
+                self.display_step = 30
+            elif self._total >= 2000:
+                self.display_step = 20
+            elif self._total > 1000:
+                self.display_step = 10
+            elif self._total >= 600:
+                self.display_step = 6
+            elif self._total >= 300:
+                self.display_step = 3
+            elif self._total >= 100:
+                self.display_step = 2
+            elif self._total >= 20:
+                self.display_step = 2
+            self.epoch = 0
+            self.init_ui_progress()
         return self
 
     def show(self, epoch=None, clear=True):
@@ -265,6 +289,9 @@ class AbuMulPidProgress(object):
         :param clear: 默认True, 子进程显示新的进度前，先do_clear_output所有输出
         :return:
         """
+        if not self.show_progress:
+            return
+
         self.epoch = epoch if epoch is not None else self.epoch + 1
         if self.epoch % self.display_step == 0:
             ps = round(self.epoch / self._total * 100, 2)
@@ -273,19 +300,25 @@ class AbuMulPidProgress(object):
             if not ABuEnv.g_is_ipython or self._total < 2:
                 if clear:
                     do_clear_output()
+                    # clear_std_output()
                 print(ps_text)
+
             self.update_ui_progress(ps, ps_text)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """
         以上下文管理器类方式实现__exit__，针对在子进城中的输出显示进度进行do_clear_output扫尾工作
         """
+        if not self.show_progress:
+            return
+
         clear = False
         if clear:
             # clear在mac上应该打开, 由于windows某些版本浏览器wait=True会有阻塞情况，如果wait＝False, 有clear之后的风险，
             do_clear_output(wait=True)  # wait 需要同步否则会延迟clear
         else:
-            print("pid:{} done!".format(os.getpid()))
+            # print("pid:{} done!".format(os.getpid()))
+            pass
 
         self.close_ui_progress()
 
@@ -314,6 +347,7 @@ class AbuBlockProgress(object):
                 end = format('*', p_str)
                 progress_str = '{}{}'.format(label, end)
                 do_clear_output()
+                # clear_std_output()
                 print(progress_str)
                 count += 1
                 if count > self.max_step:
@@ -327,6 +361,7 @@ class AbuBlockProgress(object):
         if self.sub_process is not None and self.sub_process.is_alive():
             self.sub_process.terminate()
             do_clear_output()
+            # clear_std_output()
 
 
 class AbuProgress(object):

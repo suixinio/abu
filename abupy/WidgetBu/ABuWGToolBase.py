@@ -13,10 +13,11 @@ import ipywidgets as widgets
 import pandas as pd
 
 from ..CoreBu import ABuEnv
-from ..WidgetBu.ABuWGBase import WidgetBase, show_msg_func, browser_down_csv_zip
+from ..WidgetBu.ABuWGBase import WidgetBase, show_msg_func
 from ..WidgetBu.ABuWGBSymbol import WidgetSymbolChoice
 from ..WidgetBu.ABuWGBRunBase import WidgetEnvSetMixin, WidgetTimeModeMixin
 from ..MarketBu import ABuSymbolPd
+from ..MarketBu.ABuDataCheck import browser_down_csv_zip
 from ..UtilBu import ABuProgress
 from ..TLineBu.ABuTL import AbuTLine
 
@@ -51,8 +52,8 @@ def single_fetch_symbol_analyse(func):
     def wrapper(self, bt):
         symbol = self._choice_symbol_single()
         kl = self._fetch_single_kl(symbol)
-
         ABuProgress.clear_output()
+        # ABuProgress.clear_std_output()
         if kl is not None:
             # 清理之前的输出结果
             kl_tl = AbuTLine(kl.close, 'kl')
@@ -71,6 +72,7 @@ def multi_fetch_symbol_analyse(func):
         choice_symbol = self._choice_symbol_multi()
         kl_dict = self._fetch_multi_kl(choice_symbol)
         ABuProgress.clear_output()
+        # ABuProgress.clear_std_output()
         if kl_dict is not None and len(kl_dict) > 0:
             return func(self, kl_dict, bt)
         else:
@@ -93,6 +95,7 @@ def multi_fetch_symbol_df_analyse(col_key):
             choice_symbol = self._choice_symbol_multi()
             cg_df = self._fetch_multi_kl_col(choice_symbol, col_key=col_key)
             ABuProgress.clear_output()
+            # ABuProgress.clear_std_output()
             if cg_df is not None and len(cg_df) > 0:
                 return func(self, cg_df, bt)
             else:
@@ -119,11 +122,12 @@ class WidgetToolBase(WidgetBase):
         self.label_layout = widgets.Layout(width='300px', align_items='stretch')
         self.tool_layout = widgets.Layout(align_items='stretch', justify_content='space-between')
         self.scroll_widget_layout = widgets.Layout(overflow_x='scroll',
-                                                   flex_direction='row',
+                                                   # flex_direction='row',
                                                    display='flex')
         self.description_layout = widgets.Layout(height='150px')
         # 默认不启动可滚动因子界面，因为对外的widget版本以及os操作系统不统一
         self.scroll_factor_box = False
+        self._sub_children_group_cnt = 3
 
     def _sub_children(self, children, n_split):
         """将children每n_split个为一组，组装子children_group序列"""

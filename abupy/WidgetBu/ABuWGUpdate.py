@@ -13,7 +13,8 @@ import ipywidgets as widgets
 from ..CoreBu.ABu import run_kl_update
 from ..CoreBu import ABuEnv
 from ..UtilBu import ABuProgress
-from ..WidgetBu.ABuWGBase import WidgetBase, browser_down_csv_zip
+from ..WidgetBu.ABuWGBase import WidgetBase
+from ..MarketBu.ABuDataCheck import browser_down_csv_zip
 from ..CoreBu.ABuEnv import EMarketTargetType, EMarketSourceType
 
 __author__ = '阿布'
@@ -107,8 +108,6 @@ class WidgetUpdate(WidgetBase, WidgetTimeModeMixin):
     # noinspection PyUnusedLocal
     def run_yun_down(self, bt):
         """打开浏览器csv zip地址准备开始下载"""
-        # 清理之前的输出结果
-        ABuProgress.clear_output()
         browser_down_csv_zip(open_browser=True)
 
     # noinspection PyUnusedLocal

@@ -12,33 +12,28 @@ import ipywidgets as widgets
 from abc import ABCMeta, abstractmethod
 from IPython.display import display
 
-from ..CoreBu import ABuEnv
-from ..CoreBu.ABuFixes import six
+from ..CoreBu.ABuFixes import six, partial
 from ..UtilBu.ABuStrUtil import to_unicode
+from ..UtilBu.ABuOsUtil import show_msg
 from ..MarketBu.ABuSymbol import search_to_symbol_dict
 
 __author__ = '阿布'
 __weixin__ = 'abu_quant'
 
-"""基于不同系统的提示框使用partial包装title以及显示log"""
-# show_msg_func = partial(show_msg, '提示', log=True)
 show_msg_func = logging.info
+"""基于不同系统的提示框使用partial包装title以及显示log"""
+show_msg_toast_func = partial(show_msg, u'提示', log=True)
 
 
-def browser_down_csv_zip(open_browser=False):
-    """浏览器打开教程使用的csv数据百度云地址"""
+def accordion_shut(accordion):
+    """由于版本兼容ipython widgets问题，所以需要对折叠内容做不同处理，且需要捕获异常"""
     try:
-        if open_browser:
-            import webbrowser
-            webbrowser.open('https://pan.baidu.com/s/1geNZgqf', new=0, autoraise=True)
-            show_msg_func(u'提取密码: gvtr')
+        accordion.selected_index = -1
     except:
-        pass
-    finally:
-        logging.info(u'建议直接从百度云下载教程中使用的csv格式美股，A股，港股，币类，期货6年日k数据: ')
-        logging.info(u'下载地址: https://pan.baidu.com/s/1geNZgqf')
-        logging.info(u'提取密码: gvtr')
-        logging.info(u'下载完成后解压zip得到\'csv\'文件夹到\'{}\'目录下'.format(ABuEnv.g_project_data_dir))
+        try:
+            accordion.selected_index = None
+        except:
+            pass
 
 
 # noinspection PyUnresolvedReferences,PyProtectedMember
@@ -77,16 +72,16 @@ class WidgetFactorBase(six.with_metaclass(ABCMeta, WidgetBase)):
 class WidgetFactorManagerBase(six.with_metaclass(ABCMeta, WidgetBase)):
     """策略管理可视化基础类"""
 
-    def __init__(self):
+    def __init__(self, show_add_buy=True, add_button_style='default'):
         self.factor_dict = {}
         self.factor_wg_array = []
         # 策略候选池可x轴左右滚动
         self.factor_layout = widgets.Layout(overflow_x='scroll',
-                                            flex_direction='row',
+                                            # flex_direction='row',
                                             display='flex')
         self.selected_factors = widgets.SelectMultiple(
             options=[],
-            description=u'已添加的全局策略:',
+            description=u'已添加策略:',
             disabled=False,
             layout=widgets.Layout(width='100%', align_items='stretch')
         )
@@ -97,6 +92,9 @@ class WidgetFactorManagerBase(six.with_metaclass(ABCMeta, WidgetBase)):
         self.factor_box = None
         # 默认不启动可滚动因子界面，因为对外的widget版本以及os操作系统不统一
         self.scroll_factor_box = False
+        self._sub_children_group_cnt = 3
+        self.show_add_buy = show_add_buy
+        self.add_button_style = add_button_style
         # 构建具体子类的界面构建
         self._init_widget()
         if self.factor_box is None:
@@ -147,16 +145,27 @@ class WidgetFactorManagerBase(six.with_metaclass(ABCMeta, WidgetBase)):
         # 通知其它需要一起更新的界面进行更新
         self.notify_subscriber()
 
-    def add_factor(self, factor_dict, factor_desc_key):
+    def add_factor(self, factor_dict, factor_desc_key, only_one=False):
         """根据具体策略提供的策略字典对象和策略描述构建上层策略序列"""
         if factor_desc_key in self.factor_dict:
-            msg = u'{} 策略已经添加过，重复添加！'.format(factor_desc_key)
-            show_msg_func(msg)
+            msg = u'{} 策略已经添加过，重复添加！'.format(to_unicode(factor_desc_key))
+            show_msg_toast_func(msg)
             return
+        if only_one:
+            """
+                非重复容器类型策略，如一个买入策略只能对应一个仓位管理策略
+                大多数为可复容器类型策略，如可以有多个买入因子，多个卖出，
+                多个选股因子
+            """
+            # 对基础类型不要使用clear等函数，py2低版本不支持
+            # self.factor_dict.clear()
+            self.factor_dict = {}
         self.factor_dict[factor_desc_key] = factor_dict
         self.selected_factors.options = list(self.factor_dict.keys())
         # 通知其它需要一起更新的界面进行更新
         self.notify_subscriber()
+        msg = u'{}策略已添加成功！'.format(to_unicode(factor_desc_key))
+        show_msg_toast_func(msg)
 
 
 class WidgetSearchBox(WidgetBase):
@@ -208,3 +217,9 @@ class WidgetSearchBox(WidgetBase):
             result_options = [u'{}:{}'.format(to_unicode(result_dict[symbol]), to_unicode(symbol))
                               for symbol in result_dict]
             self.search_result.options = result_options
+
+
+# noinspection PyUnusedLocal
+def permission_denied(*arg, **kwargs):
+    """执行权限不足的用户提示"""
+    show_msg_toast_func(u'所执行的操作权限不足！')

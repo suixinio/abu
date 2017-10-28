@@ -24,7 +24,7 @@ from ..CoreBu.ABuParallel import delayed, Parallel
 from ..CoreBu.ABuEnv import EMarketDataSplitMode, EMarketTargetType
 from ..MarketBu import ABuSymbolPd
 from ..MarketBu.ABuMarket import split_k_market, all_symbol
-from ..MarketBu.ABuSymbol import IndexSymbol
+from ..MarketBu.ABuSymbol import IndexSymbol, Symbol
 from ..UtilBu.ABuDTUtil import consume_time
 from ..UtilBu.ABuProgress import do_clear_output
 from ..CoreBu.ABuEnvProcess import add_process_env_sig, AbuEnvProcess
@@ -87,7 +87,7 @@ def from_net(func):
 
 
 @from_local
-def _find_similar(symbol, cmp_cnt=None, n_folds=None, start=None, end=None, show_cnt=None, rolling=False,
+def _find_similar(symbol, cmp_cnt=None, n_folds=2, start=None, end=None, show_cnt=None, rolling=False,
                   show=True, corr_type=ECoreCorrType.E_CORE_TYPE_PEARS):
     """
     被from_local装饰器装饰 即强制走本地数据，获取全市场symbol涨跌幅度pd.DataFrame对象，
@@ -102,6 +102,9 @@ def _find_similar(symbol, cmp_cnt=None, n_folds=None, start=None, end=None, show
     :param show: 是否可视化最终top最相关的股票
     :param corr_type: ECoreCorrType对象，暂时支持皮尔逊，斯皮尔曼，＋－符号相关系数，移动时间加权相关系数
     """
+    if isinstance(symbol, Symbol):
+        # 如果传递的时Symbol对象，取value
+        symbol = symbol.value
     # 获取全市场symbol涨跌幅度pd.DataFrame对象
     market_change_df = _all_market_cg(symbol, cmp_cnt=cmp_cnt, n_folds=n_folds, start=start, end=end)
     if market_change_df is None:
@@ -136,7 +139,7 @@ def find_similar_with_se(symbol, start, end, show_cnt=10, rolling=False, show=Tr
                          corr_type=corr_type)
 
 
-def find_similar_with_folds(symbol, n_folds=None, show_cnt=10, rolling=False, show=True,
+def find_similar_with_folds(symbol, n_folds=2, show_cnt=10, rolling=False, show=True,
                             corr_type=ECoreCorrType.E_CORE_TYPE_PEARS):
     """
     固定参数使用n_folds参数提供时间范围规则，套接_find_similar，为_find_similar提供时间范围规则
@@ -269,7 +272,7 @@ def _net_cg_df_create(symbol, benchmark):
 
 
 @consume_time
-def _all_market_cg(symbol, cmp_cnt=None, n_folds=None, start=None, end=None):
+def _all_market_cg(symbol, cmp_cnt=None, n_folds=2, start=None, end=None):
     """
     获取全市场symbol涨跌幅度pd.DataFrame对象
     :param symbol: 外部指定目标symbol，str对象

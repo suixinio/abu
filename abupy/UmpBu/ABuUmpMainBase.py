@@ -29,6 +29,7 @@ from .ABuUmpBase import AbuUmpBase
 from ..CoreBu.ABuFixes import GMM
 from ..UtilBu.ABuProgress import AbuMulPidProgress
 from ..CoreBu.ABuParallel import delayed, Parallel
+from ..UtilBu.ABuDTUtil import plt_show
 
 __author__ = '阿布'
 __weixin__ = 'abu_quant'
@@ -932,6 +933,9 @@ class AbuUmpMainBase(AbuUmpBase):
                     ................................
         """
         if llps is None:
+            if not hasattr(self, 'llps'):
+                # fit中订单不足量等终止情况
+                return
             llps = self.llps
 
         clf_cluster_dict = {}
@@ -1146,9 +1150,10 @@ class AbuUmpMainBase(AbuUmpBase):
             2016-01-29         -3.855   46       18    -0.0327
             2014-11-12          6.671    8       24    -0.0140
         """
-        # 可视化所有训练集中被拦截的交易profit_cg的cumsum
-        nts_pd.sort_index()['profit_cg'].cumsum().plot()
-        plt.show()
+
+        with plt_show():
+            # 可视化所有训练集中被拦截的交易profit_cg的cumsum
+            nts_pd.sort_index()['profit_cg'].cumsum().plot()
 
     def best_hit_cnt_info(self, llps=None):
         """
